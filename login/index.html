@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8"/>
+    <title>Login • Whisper</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <!-- Optional: keep your existing CSS -->
+    <link rel="stylesheet" href="index.css">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script type="text/babel">
+      const { useEffect, useRef, useState } = React;
+
+      function Login() {
+        const [phase, setPhase] = useState("username"); 
+        const [cooldown, setCooldown] = useState(0);
+        const [msg, setMsg] = useState("");
+        const [submitting, setSubmitting] = useState(false);
+
+        const usernameRef = useRef(null);
+        const otpRef = useRef(null);
+        const cdTimerRef = useRef(null);
+
+        
+        useEffect(() => { usernameRef.current?.focus(); }, []);
+
+        useEffect(() => {
+          if (cooldown <= 0) return;
+          clearInterval(cdTimerRef.current);
+          cdTimerRef.current = setInterval(() => {
+            setCooldown(c => {
+              if (c <= 1) {
+                clearInterval(cdTimerRef.current);
+                return 0;
+              }
+              return c - 1;
+            });
+          }, 1000);
+          return () => clearInterval(cdTimerRef.current);
+        }, [cooldown]);
+
+        async function requestOtp() {
+          const username = (usernameRef.current?.value || "").trim();
+          if (!username) { setMsg("Enter username"); usernameRef.current?.focus(); return; }
+
+          setSubmitting(true);
+          setMsg("Sending code…");
+
+          const fd = new FormData();
+          fd.append("action", "request_otp");
+          fd.append("username", username);
+          fd.append("company_url", ""); 
+
+          try {
+            const res = await fetch("../auth_api.php", { method: "POST", body: fd });
+            const j = await res.json();
+
+            if (j.ok) {
+              setMsg("Code sent. Check your email.");
+              setPhase("otp");
+              setCooldown(j.cooldown_sec ?? 30);
+              otpRef.current?.focus();
+            } else if (j.error === "cooldown") {
+              setPhase("otp");
+              setCooldown(j["retry after sec"] ?? j.retry_after_sec ?? 30);
+              setMsg("Please wait before requesting another code.");
+              otpRef.current?.focus();
+            } else {
+              setMsg("Error: " + (j.error || "unknown"));
+            }
+          } catch {
+            setMsg("Network error. Try again.");
+          } finally {
+            setSubmitting(false);
+          }
+        }
+
+        async function verifyOtp() {
+          const username = (usernameRef.current?.value || "").trim();
+          const otp = (otpRef.current?.value || "").trim();
+          if (!otp) { setMsg("Enter the 6-digit code"); otpRef.current?.focus(); return; }
+
+          setSubmitting(true);
+          setMsg("Verifying…");
+
+          const fd = new FormData();
+          fd.append("action", "verify_otp");
+          fd.append("username", username);
+          fd.append("otp", otp);
+
+          try {
+            const res = await fetch("../auth_api.php", { method: "POST", body: fd });
+            const j = await res.json();
+            if (j.ok) {
+              localStorage.setItem("authToken", j.token);
+              localStorage.setItem("authUsername", username);
+              document.cookie = "authUsername=" + encodeURIComponent(username) + "; path=/";
+              window.location.href = "../index.php?username=" + encodeURIComponent(username);
+              return;
+            }
+            setMsg("Error: " + (j.error || "invalid code"));
+          } catch {
+            setMsg("Network error. Try again.");
+          } finally {
+            setSubmitting(false);
+          }
+        }
+
+        function onSubmit(e) {
+          e.preventDefault();
+          if (phase === "username") requestOtp();
+          else verifyOtp();
+        }
+
+        const sendBtnLabel =
+          phase === "username"
+            ? (cooldown > 0 ? `Send Code (wait ${cooldown}s)` : "Send Code")
+            : "Verify Code";
+
+        return (
+          <div className="login-container">
+            <h2>Login</h2>
+
+            <form onSubmit={onSubmit} autoComplete="off">
+              <label htmlFor="username">Username</label>
+              <input id="username" name="username" ref={usernameRef} required disabled={submitting && phase==="username"} />
+
+              <input type="text" name="company_url" style={{ display: "none" }} tabIndex={-1} readOnly />
+
+              {phase === "otp" && (
+                <>
+                  <div style={{ marginTop: "0.75rem" }}>
+                    <label htmlFor="otp">6-digit code</label>
+                    <input id="otp" name="otp" inputMode="numeric" maxLength={6} ref={otpRef} disabled={submitting && phase==="otp"} />
+                  </div>
+
+                  <div style={{ marginTop: ".5rem" }}>
+                    <button
+                      type="button"
+                      onClick={() => cooldown === 0 && requestOtp()}
+                      disabled={cooldown > 0 || submitting}
+                      aria-disabled={cooldown > 0 || submitting}
+                    >
+                      {cooldown > 0 ? `Resend Code (wait ${cooldown}s)` : "Resend Code"}
+                    </button>
+                  </div>
+                </>
+              )}
+
+              <button type="submit" style={{ marginTop: "1rem" }} disabled={submitting || (phase==="username" && cooldown>0)}>
+                {sendBtnLabel}
+              </button>
+
+              <p className="error-message" aria-live="polite" style={{ minHeight: "1.2em", marginTop: ".5rem" }}>
+                {msg}
+              </p>
+            </form>
+          </div>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById("root")).render(<Login />);
+    </script>
+  </body>
+</html>

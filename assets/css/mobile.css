@@ -1,0 +1,68 @@
+@media (max-width:450px)  {
+	#chats_list, #chat_window{
+		padding: 0;
+		max-width: 100vh;
+		overflow-y: auto;
+	}	
+	
+	#chat_window{
+		position: absolute;
+		z-index: -100;
+	}
+	
+	#chat_window.visable{
+		z-index: 100;
+	}
+
+	#chat_window .header{
+		position: fixed;
+		top: 0;
+		right: 0;
+		z-index: 10;
+		width: 100%;
+		margin: 0 auto;
+	}
+
+	#chat_window .chat-container{
+		margin-top: 60px;
+	}
+
+	#chat_window #send_msg{
+		position: fixed;
+		bottom: 0;
+		right: 0;
+		z-index: 10;
+		width: 100%;
+		margin: 0 auto;		
+	}
+	
+	.hide_on_mobile{
+		display: none;
+	}
+	.jconfirm.attach-skin .attach-dropzone{ 
+		display:none !important; 
+		
+	}
+	
+    .jconfirm.attach-skin .jconfirm-box{
+		width:auto !important;
+		max-width: 86vw !important;
+		max-height: 20vh !important;
+		margin: 0 auto !important;
+		display: flex;           
+		flex-direction: column;
+	}
+
+	.jconfirm.attach-skin .jconfirm-content-pane{
+		flex: 1 1 auto;
+		overflow: auto;
+		max-height: none !important;   
+	}
+
+	.jconfirm.attach-skin .jconfirm-buttons{
+		position: static;
+		flex: 0 0 auto;
+		padding-top: 8px;
+		background: #fff;             
+	}
+}
